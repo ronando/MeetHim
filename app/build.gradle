@@ -45,7 +45,7 @@ dependencies {
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
 
-    //leanclound 封装库
-    implementation project(':lib.library.leanclound')
+    //leancloud 封装库
+    implementation project(':lib.library.leancloud')
 
 }

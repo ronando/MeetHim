@@ -1,4 +1,4 @@
-package com.meethim.commeethim;
+package com.meethim.leancloud;
 
 import org.junit.Test;
 

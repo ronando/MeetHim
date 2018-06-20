@@ -1,4 +1,4 @@
-package com.meethim.commeethim;
+package com.meethim.leancloud;
 
 import android.content.Context;
 import android.support.test.InstrumentationRegistry;
