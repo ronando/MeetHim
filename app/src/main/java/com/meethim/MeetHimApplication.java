@@ -11,7 +11,7 @@ import com.avos.avoscloud.AVOSCloud;
  * @Date 2018/6/20
  * @mail： wuzhao@in66.com
  */
-public class MeetHimApplication extends Application{
+public class MeetHimApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
@@ -20,8 +20,8 @@ public class MeetHimApplication extends Application{
 
     private void initLeancloud() {
         // 初始化参数依次为 this, AppId, AppKey
-        AVOSCloud.initialize(this,Constants.LEAN_CLOUD_APPID,Constants.LEAN_CLOUD_CLIENT_KEY);
-        AVOSCloud.setDebugLogEnabled(true);
+        AVOSCloud.initialize(this, com.meethim.leanclound.Constants.LEAN_CLOUD_APPID, com.meethim.leanclound.Constants.LEAN_CLOUD_CLIENT_KEY);
+        AVOSCloud.setDebugLogEnabled(Constants.DEBUG);
     }
 
 

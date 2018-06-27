@@ -8,7 +8,6 @@ package com.meethim
  */
 
 object Constants{
-    const val LEAN_CLOUD_APPID = "tMuiwjuOcUX3qpekVWNQxfHU-gzGzoHsz"
-    const val LEAN_CLOUD_CLIENT_KEY = "urkcutrlOzv9zGQYYDzfwUSN"
+    const val DEBUG = true
 }
 

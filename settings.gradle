@@ -1,1 +1,1 @@
-include ':app', ':lib.library.leancloud'
+include ':app', ':lib.library.leancloud', ':lib.module.user'
