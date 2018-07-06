@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">com.meethim</string>
+    <string name="goods_discription">商品描述</string>
+    <string name="seletct_a_pic">从相册选择一张照片</string>
+    <string name="submit">提交</string>
+    <string name="detail">详情</string>
+    <string name="publish">发布</string>
+    <string name="action_logout">退出登录</string>
+</resources>
