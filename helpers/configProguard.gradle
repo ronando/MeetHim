@@ -1,0 +1,16 @@
+android {
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles '../../proguard-android.txt', 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            shrinkResources false
+        }
+    }
+    defaultConfig {
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+}

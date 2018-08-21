@@ -19,7 +19,7 @@ android {
             }
         }
         ndk {
-            abiFilters  "armeabi-v7a"
+            abiFilters  "armeabi-v7a","x86"
         }
     }
     buildTypes {
@@ -40,7 +40,7 @@ dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
     implementation 'com.android.support:appcompat-v7:26.1.0'
     implementation 'com.android.support:support-annotations:27.1.1'
-    implementation 'com.android.support.constraint:constraint-layout:1.1.0'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
@@ -49,4 +49,53 @@ dependencies {
 //    TODO: remove to sub modules
     implementation project(':lib.library.leancloud')
 
+}
+
+// 删除所有的app.x模块的launcher activity
+if (android.hasProperty('applicationVariants')) {
+    android.applicationVariants.all { variant ->
+        if (variant.name.contains('develop')) {
+            variant.outputs.each { output ->
+                output.processManifest.doLast {
+                    println "remove launcher activities " + variant.name + " for " + project.name
+                    String manifestPath = "$manifestOutputDirectory/AndroidManifest.xml"
+                    removeRedundantLauncher(file(manifestPath))
+                    String instantRunManifestPath = "$instantRunManifestOutputDirectory/AndroidManifest.xml"
+                    removeRedundantLauncher(file(instantRunManifestPath))
+                }
+            }
+        }
+    }
+}
+
+def removeRedundantLauncher(File manifestOutFile) {
+    if(manifestOutFile.exists()){
+        def content = manifestOutFile.getText('UTF-8')
+        // 第二个false表示忽略namespace
+        def parsed = new XmlParser(false, false).parseText(content)
+        NodeList activities = parsed.application.activity
+        if (activities == null) {
+            return
+        }
+
+        NodeList launchers = activities.findAll { Node node ->
+            String attrName = node.attribute("android:name")
+            if (attrName == null) {
+                return false
+            }
+            boolean nameMatch = attrName.endsWith(".LauncherActivity")
+            // Todo: also matching intent-filter is safer
+            return nameMatch
+        }
+        if (launchers == null) {
+            return
+        }
+
+        launchers.each { Node node ->
+            node.parent().remove(node)
+        }
+
+        XmlNodePrinter printer = new XmlNodePrinter(new PrintWriter(manifestOutFile))
+        printer.print(parsed)
+    }
 }

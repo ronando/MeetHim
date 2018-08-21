@@ -1,0 +1,330 @@
+import java.util.regex.Pattern
+
+//模块化配置，使各模块能单独运行
+
+
+
+// 定义全局变量
+ext {
+    startProjectName = null;
+    startTaskName = null;
+
+    smallProject = null
+    stubProjects = []
+    hostProject = null
+    appProjects = []
+    libProjects = []
+
+    buildSmall = false
+    isBuildHost = false
+    isBuildApp = false
+    freelineProject = null
+}
+
+
+// 判断是否为运行按钮触发，包括run, debug run, instant run
+def isTriggerByRunApp = {
+    def projectDir = project.gradle.startParameter.projectDir
+    def taskNames = project.gradle.startParameter.taskNames
+    if (rootProject.projectDir.path.equals(projectDir.path)) {
+        if (taskNames.size() == 1) {
+            if (taskNames[0].startsWith(':app:assemble')) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// 判断是否是rebuild触发
+def isTriggerByAsRebuild = {
+    def projectDir = project.gradle.startParameter.projectDir
+    def taskNames = project.gradle.startParameter.taskNames
+    def subprojectNames = rootProject.childProjects.keySet().asList()
+    if (rootProject.projectDir.path.equals(projectDir.path)) {
+        if (taskNames.size() >= 2 && taskNames[0] == 'clean') {
+            taskNames.remove(0)
+            boolean isAllIncludeAssemble = true
+            for (def name : taskNames) {
+                if (!name.contains('assemble')) {
+                    isAllIncludeAssemble = false
+                    break
+                }
+            }
+            if (isAllIncludeAssemble && taskNames.size() == subprojectNames.size()) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// 判断是否点击AS build apks触发
+def isTriggerByAsBuildApks = {
+    def projectDir = project.gradle.startParameter.projectDir
+    def taskNames = project.gradle.startParameter.taskNames
+    def subprojectNames = rootProject.childProjects.keySet().asList()
+    if (rootProject.projectDir.path.equals(projectDir.path)) {
+        if (taskNames.size() == 1) {
+            if (taskNames[0].startsWith(':app:assemble')) {
+                return true
+            }
+        } else if (taskNames.size() >= 2) {
+            boolean isAllMatched = true
+            for (String name : taskNames) {
+                if (!name.startsWith(':app') || !name.contains('assemble')) {
+                    isAllMatched = false
+                    break
+                }
+            }
+            if (isAllMatched) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// 判断是否点击AS generate apk触发
+def isTriggerByAsGenerateApkForApp = {
+    def projectDir = project.gradle.startParameter.projectDir
+    def taskNames = project.gradle.startParameter.taskNames
+    def subprojectNames = rootProject.childProjects.keySet().asList()
+    if (rootProject.projectDir.path.equals(projectDir.path)) {
+        if (taskNames.size() == 1) {
+            if (taskNames[0].startsWith(':app:assemble')) {
+                return true
+            }
+        }
+    }
+    return false
+}
+
+// 命令行触发时解析start parameters
+ext.checkCommandLine = {
+    def projectDir = project.gradle.startParameter.projectDir
+    def taskNames = project.gradle.startParameter.taskNames
+    def projectName = null
+    def realTask = null
+    if (taskNames.size() == 1) {
+        def t = taskNames[0]
+        if (t.startsWith(':')) {
+            // gradlew :app.xxx:assembleRelease
+            def tArr = t.split(':')
+            if (tArr.length == 3) { // ['', 'app.xxx', 'assembleRelease']
+                projectName = tArr[1]
+                realTask = tArr[2]
+            }
+        } else {
+            realTask = t
+        }
+
+        // gradlew -p subDir task
+        if (projectDir != null && !rootProject.projectDir.path.equals(projectDir.path)) {
+            String pdPath = projectDir.path
+            if (pdPath.contains(File.separator)) {
+                String pattern = Pattern.quote(java.lang.System.getProperty("file.separator"))
+                String[] segs = pdPath.split(pattern)
+                projectName = segs[segs.length - 1]
+            }
+        }
+
+    } else if (taskNames.size() >= 2) {
+        boolean isIncludeAppProject = false
+        // gradlew task1 :app:xxxTask2
+        // 取最后一个
+        /* 1, 在某种情况下(高版本手机？studio配置了某些优化编译选项?)执行run会先执行对应模块的clean比如:app:clean或者:app.camera:clean，紧接着执行:app:assembleDevelopDebug
+           2, 的确在执行多tasks
+        */
+        for (String name : taskNames) {
+            if (name.startsWith(':app:')) {
+                isIncludeAppProject = true
+                def tArr = name.split(':')
+                if (tArr.length == 3) {
+                    projectName = tArr[1]
+                    realTask = tArr[2]
+                }
+            }
+        }
+        // gradlew :app.xxx:task1 :app.xxx:task2 task3
+        // 取最后一个
+        if (!isIncludeAppProject) {
+            for (String name : taskNames) {
+                if (name.startsWith(':')) {
+                    def tArr = name.split(':')
+                    if (tArr.length == 3) {
+                        projectName = tArr[1]
+                        realTask = tArr[2]
+                    }
+                } else {
+                    projectName = null
+                    realTask = name
+                }
+            }
+        }
+    }
+    startProjectName = projectName
+    startTaskName = realTask
+}
+
+
+// 检测task触发来源，AS还是命令行，触发哪种任务
+ext.checkTaskTrigger = {
+    def projectDir = project.gradle.startParameter.projectDir
+    printLog 'start parameter project dir: ' + projectDir
+    checkCommandLine()
+    printLog "startParameter task name: " + startTaskName + " project name: " + startProjectName
+    // 命令行触发 （没有考虑命令行执行gradle -p 指定根目录的情况，这种情况几乎不会出现）
+    if (projectDir == null || (projectDir !=null && !rootProject.projectDir.path.equals(projectDir.path))) {
+        if ("cleanLib".equals(startTaskName)
+                || "cleanBundle".equals(startTaskName)
+                || "buildLib".equals(startTaskName)
+                || "buildBundle".equals(startTaskName)
+                || "cleanPublic".equals(startTaskName)
+                || "makeProject".equals(startTaskName)
+                || "small".equals(startTaskName)
+                || "smallLint".equals(startTaskName)
+                || ("app".equals(startProjectName) && startTaskName != null && startTaskName.contains('Small'))
+                || (startProjectName != null && !rootProject.projectDir.path.endsWith(startProjectName) && (startTaskName == "assembleRelease" || startTaskName == "aR"))) {
+            println "______ build small _______"
+            buildSmall = true
+        } else if ((startProjectName == 'app')
+                && (startTaskName != null)) {
+            println "______ build host _______"
+            isBuildHost = true
+        } else if (startProjectName == null && 'build' == startTaskName) {
+            println "______ build host _______"
+            isBuildHost = true
+        } else {
+            println "______ build app _______"
+            isBuildApp = true
+        }
+    } else { // AS触发
+        if (isTriggerByRunApp() || isTriggerByAsRebuild() || isTriggerByAsBuildApks() || isTriggerByAsGenerateApkForApp()) {
+            println "______ build host _______"
+            isBuildHost = true
+        } else {
+            println "______ build app _______"
+            isBuildApp = true
+        }
+
+    }
+
+}
+
+checkTaskTrigger()
+
+
+// 动态让app依赖于app.xxx
+afterEvaluate {
+    println "root project afterEvaluate !!!"
+
+    subprojects.each {
+        // 记录宿主工程
+        if (it.name == 'app') {
+            hostProject = it
+            return;
+        }
+        // 记录app+工程(small的特有工程)
+        if (it.name.startsWith("app+")) {
+            stubProjects.add(it)
+            return
+        }
+        String type = null
+        if (it.name.contains('library')) {
+            type = 'lib'
+        } else if (it.name.contains('module')) {
+            type = 'app'
+        } else {
+            throw new Exception("found illegal project: " + it.name)
+            return
+        }
+        switch (type) {
+        // 收集所有的app工程
+            case 'app':
+                appProjects.add(it)
+                break;
+        // 收集所有的lib工程
+            case 'lib':
+                libProjects.add(it)
+                break
+        }
+    }
+
+
+    // 如果当前运行的是app，动态将app.xxx作为依赖添加
+    if (isBuildHost) {
+        hostProject.afterEvaluate {
+            printLog "run app, to add app.xxx as dependencies..."
+
+            appProjects.each {
+                hostProject.dependencies.add('implementation', it)
+            }
+        }
+    } else if (startProjectName == null && 'checkBeforeCleanBuild' == startTaskName) {
+        if (freelineProject != null && freelineProject.name == 'app') {
+            hostProject.afterEvaluate {
+                printLog "run freeline app, to add app.xxx as dependencies..."
+                appProjects.each {
+                    hostProject.dependencies.add('implementation', it)
+                }
+
+            }
+        }
+    } else if (startProjectName == null && 'initFreeline' == startTaskName) {
+        if (freelineProject != null && freelineProject.name == 'app') {
+            hostProject.afterEvaluate {
+                printLog "run freeline app, to add app.xxx as dependencies..."
+                appProjects.each {
+                    hostProject.dependencies.add('implementation', it)
+                }
+
+            }
+        }
+    }
+
+}
+
+// 如果当前运行的工程是app，则动态为app.xxx应用library插件，否则应用application插件。
+subprojects { Project p ->
+    if (p.name.startsWith("lib.module.")) {
+        p.beforeEvaluate {
+            if (isBuildHost) {
+                printLog p.name + " run +++++++++ apply library"
+                p.apply plugin: 'com.android.library'
+            } else {
+                printLog p.name + " run +++++++++ apply application !"
+                p.apply plugin: 'com.android.application'
+            }
+        }
+    }
+
+    p.afterEvaluate {
+        // 为BuildConfig添加相关标志
+        if (p.name.startsWith("app")) {
+            p.android.defaultConfig.buildConfigField(
+                    "boolean", "IS_BUILD_SMALL", buildSmall ? "true" : "false")
+            p.android.defaultConfig.buildConfigField(
+                    "boolean", "IS_BUILD_HOST", isBuildHost ? "true" : "false")
+            p.android.defaultConfig.buildConfigField(
+                    "boolean", "IS_BUILD_APP", isBuildApp ? "true" : "false")
+        }
+
+        // 如果是运行lib.module.xxx, 则为所有lib.module.开启multidex
+        if (isBuildApp && p.name.startsWith("lib.module.")) {
+            p.android.defaultConfig.multiDexEnabled = true
+        }
+
+        if (isBuildHost) {
+            // 如果是运行宿主，并且是release，则为宿主开启proguard, gradle plugin 3.0不支持为library应用shrinker
+            if (p.name == 'app' && startTaskName.contains('Release')) {
+                p.apply from: project.rootProject.getProjectDir().path + "/helpers/configProguard.gradle"
+            }
+        } else if (isBuildApp) {
+            // 如果是运行lib.module.xxx，并且是release，则为lib.module.xxx开启proguard
+            if (p.name.startsWith("lib.module") && startTaskName != null && startTaskName.contains('Release')) {
+                p.apply from: project.rootProject.getProjectDir().path + "/helpers/configProguard.gradle"
+            }
+        }
+    }
+}

@@ -1,0 +1,32 @@
+// 打印日志，可以选择是否写入文件（用于sync前期阶段不能看到log的情况）
+ext.printLog = { String log ->
+    println log
+    if (false) {
+        printLogToFile(project.rootProject, log)
+    }
+}
+
+// 将log写入文件，文件存放路径为：{p.projectDir}/build.log
+ext.printLogToFile = { Project p, String s ->
+    File logFile = new File(p.projectDir, "build.log")
+    if (!logFile.exists()) {
+        logFile.createNewFile()
+    }
+    def pw = new PrintWriter(logFile.newWriter(true))
+    pw.println s
+    pw.flush()
+    pw.close()
+}
+
+// 替换Manifest内容（在Manifest合并后的文件上进行）
+ext.replaceInManifest = {output, fromString, toString ->
+    String manifestPath = "${output.processManifest.manifestOutputDirectory}/AndroidManifest.xml"
+    def manifestOutFile = file(manifestPath)
+    def updatedContent = manifestOutFile.getText('UTF-8').replaceAll(fromString, toString)
+    manifestOutFile.write(updatedContent, 'UTF-8')
+
+    String instantRunManifestPath = "${output.processManifest.instantRunManifestOutputDirectory}/AndroidManifest.xml"
+    def instantManifestOutFile = file(instantRunManifestPath)
+    def instantUpdatedContent = manifestOutFile.getText('UTF-8').replaceAll(fromString, toString)
+    instantManifestOutFile.write(instantUpdatedContent, 'UTF-8')
+}

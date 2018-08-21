@@ -24,12 +24,21 @@ allprojects {
     repositories {
         google()
         jcenter()
-        maven {
-            url "http://mvn.leancloud.cn/nexus/content/repositories/public"
-        }
+        maven { url "http://mvn.leancloud.cn/nexus/content/repositories/public" }
+        maven { url 'https://jitpack.io' }
     }
 }
 
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
+
+// 全局配置，主要完成为宿主添加其他app依赖的工作
+String rootProjectDir = rootProject.getProjectDir()
+String realSettingsPath = rootProjectDir + "/helpers/"
+String utilsPath = realSettingsPath + "/utils.gradle"
+apply from:"$utilsPath"
+
+String configModulesPath = realSettingsPath+"config_modules.gradle"
+apply from:"$configModulesPath"
